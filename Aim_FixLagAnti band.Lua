@@ -4,10 +4,11 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local CurrentCamera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
+local Teams = game:GetService("Teams")
 
 -- Menu Settings
 local menuOpen = false
-local FOV = 170
+local FOV = 100
 local ESP_COLOR = Color3.fromRGB(0, 255, 0)
 
 -- Drawing objects
@@ -22,17 +23,6 @@ FOVring.Filled = false
 FOVring.Radius = FOV
 FOVring.Position = CurrentCamera.ViewportSize / 2
 
--- Anti-ban (ẩn hành vi bất thường)
-local function applyAntiBan()
-    local success, err = pcall(function()
-        -- Giả lập hoạt động người chơi bình thường
-        task.wait(math.random(0.1, 0.3)) -- Delay nhỏ
-    end)
-    if not success then
-        warn("Anti-ban kích hoạt: " .. tostring(err))
-    end
-end
-
 -- Toggle Menu
 local function toggleMenu()
     menuOpen = not menuOpen
@@ -43,7 +33,24 @@ local function toggleMenu()
     end
 end
 
--- Tạo ESP (Tối ưu hóa)
+-- Wall Check (Bắn xuyên tường - Kiểm tra vật cản)
+local function isTargetVisible(targetHead)
+    -- Sử dụng Raycast để kiểm tra vật cản, nhưng không kiểm tra tường (cho phép bắn xuyên tường)
+    local origin = CurrentCamera.CFrame.Position
+    local direction = (targetHead.Position - origin).Unit * 500
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character} -- Ignore LocalPlayer và các vật thể không cần thiết
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local result = Workspace:Raycast(origin, direction, raycastParams)
+    return result == nil or result.Instance:IsDescendantOf(targetHead.Parent)
+end
+
+-- Kiểm tra Team (Chỉ nhắm vào kẻ thù)
+local function isEnemy(player)
+    return player.Team ~= LocalPlayer.Team -- Kiểm tra nếu người chơi là địch
+end
+
+-- Tạo ESP
 local function createESP(player)
     if player == LocalPlayer then return end
     local espBox = Drawing.new("Square")
@@ -53,30 +60,22 @@ local function createESP(player)
     espBox.Filled = false
     ESPTable[player] = espBox
 
-    local function updateESP()
+    RunService.Heartbeat:Connect(function()
         if player.Character and player.Character:FindFirstChild("Head") then
             local head = player.Character.Head
             local screenPos, onScreen = CurrentCamera:WorldToViewportPoint(head.Position)
 
             if onScreen then
-                local distance = (Vector2.new(screenPos.X, screenPos.Y) - FOVring.Position).Magnitude
-                if distance < FOV then
-                    espBox.Visible = true
-                    espBox.Size = Vector2.new(50, 50) / (distance / 100) -- Kích thước ESP thay đổi theo khoảng cách
-                    espBox.Position = Vector2.new(screenPos.X - espBox.Size.X / 2, screenPos.Y - espBox.Size.Y / 2)
-                else
-                    espBox.Visible = false
-                end
+                espBox.Visible = true
+                espBox.Size = Vector2.new(50, 50)
+                espBox.Position = Vector2.new(screenPos.X - 25, screenPos.Y - 25)
             else
                 espBox.Visible = false
             end
         else
             espBox.Visible = false
         end
-    end
-
-    -- Kết nối sự kiện
-    RunService.RenderStepped:Connect(updateESP)
+    end)
 end
 
 -- Tìm người chơi gần nhất trong FOV
@@ -86,13 +85,16 @@ local function getClosestPlayerInFOV()
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local head = player.Character.Head
-            local screenPos, onScreen = CurrentCamera:WorldToViewportPoint(head.Position)
-            local distance = (Vector2.new(screenPos.X, screenPos.Y) - FOVring.Position).Magnitude
+            if isEnemy(player) then  -- Kiểm tra xem có phải địch không
+                local head = player.Character.Head
+                local screenPos, onScreen = CurrentCamera:WorldToViewportPoint(head.Position)
+                local distance = (Vector2.new(screenPos.X, screenPos.Y) - FOVring.Position).Magnitude
 
-            if onScreen and distance < FOV and distance < shortestDistance then
-                closestPlayer = player
-                shortestDistance = distance
+                -- Kiểm tra xem đối thủ có trong FOV và không có vật cản (bắn xuyên tường)
+                if onScreen and distance < FOV and distance < shortestDistance and isTargetVisible(head) then
+                    closestPlayer = player
+                    shortestDistance = distance
+                end
             end
         end
     end
@@ -105,26 +107,39 @@ local function applySilentAim()
     local target = getClosestPlayerInFOV()
     if target and target.Character and target.Character:FindFirstChild("Head") then
         local headPosition = target.Character.Head.Position
-        local aimDirection = (headPosition - CurrentCamera.CFrame.Position).unit
-        -- Thay đổi hướng camera
+        -- Điều chỉnh hướng camera về đầu đối thủ (100% Headshot)
         CurrentCamera.CFrame = CFrame.new(CurrentCamera.CFrame.Position, headPosition)
     end
 end
 
--- Toggle Silent Aim với chuột trái
+-- Biến để theo dõi trạng thái chuột trái
+local isMouseDown = false
+
+-- Kích hoạt Silent Aim liên tục khi chuột trái được giữ
+RunService.RenderStepped:Connect(function()
+    if isMouseDown and menuOpen then
+        applySilentAim()
+    end
+end)
+
+-- Xử lý khi chuột trái được nhấn
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if menuOpen then
-            applySilentAim()
-        end
+        isMouseDown = true
+    end
+end)
+
+-- Xử lý khi chuột trái được nhả ra
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isMouseDown = false
     end
 end)
 
 -- Cập nhật vòng FOV
 RunService.RenderStepped:Connect(function()
     FOVring.Position = CurrentCamera.ViewportSize / 2
-    applyAntiBan() -- Áp dụng anti-ban trong mỗi frame
 end)
 
 -- Đóng/Mở Menu khi nhấn phím
@@ -136,7 +151,7 @@ end)
 
 -- Tạo ESP cho người chơi
 local function onPlayerAdded(player)
-    player.CharacterAdded:Connect(function()
+    player.CharacterAdded:Connect(function(character)
         createESP(player)
     end)
 end
@@ -146,7 +161,7 @@ for _, player in ipairs(Players:GetPlayers()) do
         if player.Character then
             createESP(player)
         end
-        player.CharacterAdded:Connect(function()
+        player.CharacterAdded:Connect(function(character)
             createESP(player)
         end)
     end
