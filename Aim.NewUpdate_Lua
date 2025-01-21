@@ -10,20 +10,6 @@ local menuOpen = false
 local FOV = 500
 local ESP_COLOR = Color3.fromRGB(0, 255, 0)
 
--- Anti-Ban Settings
-local function protectScript()
-    local mt = getrawmetatable(game)
-    if setreadonly then setreadonly(mt, false) end
-    local oldIndex = mt.__index
-    mt.__index = function(t, k)
-        if k == "Name" or k == "Parent" then
-            return nil
-        end
-        return oldIndex(t, k)
-    end
-end
-protectScript()
-
 -- Drawing objects
 local FOVring = Drawing.new("Circle")
 local ESPTable = {}
@@ -40,15 +26,13 @@ FOVring.Position = CurrentCamera.ViewportSize / 2
 local function toggleMenu()
     menuOpen = not menuOpen
     if menuOpen then
-        -- Show Menu Logic here
         print("Menu Opened")
     else
-        -- Hide Menu Logic here
         print("Menu Closed")
     end
 end
 
--- Fix Lag: ESP Optimized
+-- Tạo ESP
 local function createESP(player)
     if player == LocalPlayer then return end
     local espBox = Drawing.new("Square")
@@ -58,15 +42,7 @@ local function createESP(player)
     espBox.Filled = false
     ESPTable[player] = espBox
 
-    local connection
-    connection = RunService.Heartbeat:Connect(function()
-        if not player or not player.Parent then
-            espBox:Remove()
-            ESPTable[player] = nil
-            connection:Disconnect()
-            return
-        end
-
+    RunService.Heartbeat:Connect(function()
         if player.Character and player.Character:FindFirstChild("Head") then
             local head = player.Character.Head
             local screenPos, onScreen = CurrentCamera:WorldToViewportPoint(head.Position)
