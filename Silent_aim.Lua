@@ -8,7 +8,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Menu Settings
 local menuOpen = false
-local FOV = 100
+local FOV = 170
 local ESP_COLOR = Color3.fromRGB(0, 255, 0)
 
 -- Drawing objects
