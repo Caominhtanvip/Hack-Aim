@@ -1,0 +1,101 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- Cài đặt fly
+local flying = false
+local speed = 50  -- Tốc độ bay
+local flyHeight = 50  -- Chiều cao bay
+local flySpeed = 0.5  -- Tốc độ bay trên không
+
+-- Vị trí ban đầu
+local initialPosition = RootPart.Position
+
+-- Các biến điều khiển bay
+local bodyVelocity
+local bodyGyro
+
+-- Anti-Ban: Kiểm tra trạng thái của game và các đối tượng không hợp lệ (giảm khả năng bị phát hiện)
+local function antiBanCheck()
+    -- Thực hiện một số kiểm tra an toàn, ví dụ: nếu có thay đổi đáng ngờ trong game
+    local illegalObjects = {game:GetService("Workspace"):FindFirstChild("Script")}
+    for _, obj in ipairs(illegalObjects) do
+        if obj then
+            obj:Destroy()
+        end
+    end
+end
+
+-- Hàm bật/tắt fly
+local function toggleFly()
+    flying = not flying
+
+    if flying then
+        -- Tạo BodyVelocity và BodyGyro để kiểm soát di chuyển và góc khi bay
+        bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(400000, 400000, 400000)  -- Cho phép di chuyển tự do
+        bodyVelocity.Velocity = Vector3.new(0, flySpeed, 0)
+        bodyVelocity.Parent = RootPart
+
+        bodyGyro = Instance.new("BodyGyro")
+        bodyGyro.MaxTorque = Vector3.new(400000, 400000, 400000)
+        bodyGyro.CFrame = RootPart.CFrame
+        bodyGyro.Parent = RootPart
+
+        -- Cập nhật chiều cao bay
+        RootPart.CFrame = CFrame.new(RootPart.Position.X, flyHeight, RootPart.Position.Z)
+    else
+        -- Hủy BodyVelocity và BodyGyro khi bay tắt
+        if bodyVelocity then bodyVelocity:Destroy() end
+        if bodyGyro then bodyGyro:Destroy() end
+    end
+end
+
+-- Điều khiển di chuyển khi đang bay
+local function onUpdate()
+    if flying then
+        -- Điều chỉnh vị trí và hướng đi của nhân vật
+        local direction = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            direction = direction + RootPart.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            direction = direction - RootPart.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            direction = direction - RootPart.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            direction = direction + RootPart.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            direction = direction + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            direction = direction - Vector3.new(0, 1, 0)
+        end
+
+        -- Áp dụng lực di chuyển vào BodyVelocity
+        bodyVelocity.Velocity = direction.Unit * speed
+    end
+end
+
+-- Kích hoạt Fly khi nhấn phím Insert
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Insert then
+        toggleFly()  -- Bật/Tắt fly khi nhấn phím Insert
+    end
+end)
+
+-- Cập nhật điều khiển bay mỗi frame
+RunService.RenderStepped:Connect(onUpdate)
+
+-- Chạy Anti-Ban kiểm tra sau mỗi khoảng thời gian ngắn
+RunService.Heartbeat:Connect(function()
+    antiBanCheck()
+end)
