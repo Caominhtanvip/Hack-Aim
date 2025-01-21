@@ -10,6 +10,20 @@ local menuOpen = false
 local FOV = 500
 local ESP_COLOR = Color3.fromRGB(0, 255, 0)
 
+-- Anti-Ban Settings
+local function protectScript()
+    local mt = getrawmetatable(game)
+    if setreadonly then setreadonly(mt, false) end
+    local oldIndex = mt.__index
+    mt.__index = function(t, k)
+        if k == "Name" or k == "Parent" then
+            return nil
+        end
+        return oldIndex(t, k)
+    end
+end
+protectScript()
+
 -- Drawing objects
 local FOVring = Drawing.new("Circle")
 local ESPTable = {}
@@ -34,7 +48,7 @@ local function toggleMenu()
     end
 end
 
--- Tạo ESP
+-- Fix Lag: ESP Optimized
 local function createESP(player)
     if player == LocalPlayer then return end
     local espBox = Drawing.new("Square")
@@ -44,7 +58,15 @@ local function createESP(player)
     espBox.Filled = false
     ESPTable[player] = espBox
 
-    RunService.RenderStepped:Connect(function()
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if not player or not player.Parent then
+            espBox:Remove()
+            ESPTable[player] = nil
+            connection:Disconnect()
+            return
+        end
+
         if player.Character and player.Character:FindFirstChild("Head") then
             local head = player.Character.Head
             local screenPos, onScreen = CurrentCamera:WorldToViewportPoint(head.Position)
@@ -52,7 +74,7 @@ local function createESP(player)
             if onScreen then
                 espBox.Visible = true
                 espBox.Size = Vector2.new(50, 50)
-                espBox.Position = Vector2.new(screenPos.X - 50 / 2, screenPos.Y - 50 / 2)
+                espBox.Position = Vector2.new(screenPos.X - 25, screenPos.Y - 25)
             else
                 espBox.Visible = false
             end
@@ -87,10 +109,7 @@ end
 local function applySilentAim()
     local target = getClosestPlayerInFOV()
     if target and target.Character and target.Character:FindFirstChild("Head") then
-        -- Chỉnh sửa hướng bắn sao cho bắn vào đầu đối thủ
         local headPosition = target.Character.Head.Position
-        local aimDirection = (headPosition - CurrentCamera.CFrame.Position).unit
-        -- Thay đổi hướng camera hoặc điểm bắn để bắn vào đối thủ (Silent Aim)
         CurrentCamera.CFrame = CFrame.new(CurrentCamera.CFrame.Position, headPosition)
     end
 end
@@ -109,14 +128,14 @@ end)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isMouseDown = true -- Đánh dấu trạng thái giữ chuột trái
+        isMouseDown = true
     end
 end)
 
 -- Xử lý khi chuột trái được nhả ra
 UserInputService.InputEnded:Connect(function(input, gameProcessed)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isMouseDown = false -- Đặt lại trạng thái khi chuột trái được nhả
+        isMouseDown = false
     end
 end)
 
@@ -127,7 +146,7 @@ end)
 
 -- Đóng/Mở Menu khi nhấn phím
 UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Insert then  -- Nhấn Insert để bật/tắt menu
+    if input.KeyCode == Enum.KeyCode.Insert then
         toggleMenu()
     end
 end)
