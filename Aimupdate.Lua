@@ -89,13 +89,37 @@ local function getClosestPlayerInFOV()
     return closestPlayer
 end
 
+-- Kiểm tra bắn xuyên tường
+local function canShootThroughWall(target)
+    if not target or not target.Character or not target.Character:FindFirstChild("Head") then
+        return false
+    end
+
+    local headPosition = target.Character.Head.Position
+    local rayOrigin = CurrentCamera.CFrame.Position
+    local rayDirection = (headPosition - rayOrigin).unit * 1000 -- Đường bắn dài
+
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character} -- Loại bỏ nhân vật của mình khỏi raycast
+
+    local result = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+
+    -- Nếu không có gì chắn hoặc đối tượng là nhân vật của mục tiêu
+    if not result or (result.Instance and result.Instance:IsDescendantOf(target.Character)) then
+        return true
+    end
+    return false
+end
+
 -- Áp dụng Silent Aim
 local function applySilentAim()
     local target = getClosestPlayerInFOV()
-    if target and target.Character and target.Character:FindFirstChild("Head") then
-        local headPosition = target.Character.Head.Position
-        local aimDirection = (headPosition - CurrentCamera.CFrame.Position).unit
-        CurrentCamera.CFrame = CFrame.new(CurrentCamera.CFrame.Position, headPosition)
+    if target and canShootThroughWall(target) then
+        if target.Character and target.Character:FindFirstChild("Head") then
+            local headPosition = target.Character.Head.Position
+            CurrentCamera.CFrame = CFrame.new(CurrentCamera.CFrame.Position, headPosition)
+        end
     end
 end
 
