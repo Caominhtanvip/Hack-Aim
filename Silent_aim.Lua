@@ -111,9 +111,9 @@ RunService.RenderStepped:Connect(function()
     FOVring.Position = CurrentCamera.ViewportSize / 2
 end)
 
--- Đóng/Mở Menu khi nhấn phím
+-- Đóng/Mở Menu khi nhấn phím Z
 UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Insert then  -- Nhấn Insert để bật/tắt menu
+    if input.KeyCode == Enum.KeyCode.Z then  -- Nhấn Z để bật/tắt menu
         toggleMenu()
     end
 end)
@@ -136,4 +136,4 @@ for _, player in ipairs(Players:GetPlayers()) do
     end
 end
 
-Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerAdded:Connect(onPlayerAdded)nnect(onPlayerAdded)
